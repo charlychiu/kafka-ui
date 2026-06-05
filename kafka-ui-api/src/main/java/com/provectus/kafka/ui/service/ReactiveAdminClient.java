@@ -433,7 +433,30 @@ public class ReactiveAdminClient implements Closeable {
             result.authorizedOperations().get()
           )
         )
-    );
+    ).flatMap(desc -> resolveActiveController(client, desc));
+  }
+
+  // In KRaft mode describeCluster().controller() returns an arbitrary broker (brokers advertise a
+  // random broker as the metadata controllerId for request forwarding, see KIP-590), not the real
+  // controller quorum leader. When the metadata quorum API is available we use its leader as the
+  // active controller instead. ZooKeeper-based clusters don't support it, so we fall back to the
+  // controller reported by describeCluster().
+  private static Mono<ClusterDescription> resolveActiveController(AdminClient client, ClusterDescription desc) {
+    return toMono(client.describeMetadataQuorum().quorumInfo())
+        .map(quorumInfo -> {
+          int leaderId = quorumInfo.leaderId();
+          if (leaderId < 0) {
+            return desc;
+          }
+          Node leader = desc.getNodes().stream()
+              .filter(n -> n.id() == leaderId)
+              .findFirst()
+              // dedicated KRaft controllers aren't part of the broker node list
+              .orElse(new Node(leaderId, "", -1));
+          return new ClusterDescription(
+              leader, desc.getClusterId(), desc.getNodes(), desc.getAuthorizedOperations());
+        })
+        .onErrorReturn(desc);
   }
 
   public Mono<Void> deleteConsumerGroups(Collection<String> groupIds) {
