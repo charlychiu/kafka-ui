@@ -1,0 +1,26 @@
+# Kafka UI for the ansible-kafka 4.0.1 (KRaft) cluster.
+#
+# Everything is built INSIDE Docker (see ./Dockerfile) — the host only needs
+# Docker running, no JDK / Node / Maven required.
+#
+#   docker compose -f docker-compose.kafka4.yml up -d --build
+#
+# UI: http://localhost:8080
+# Rebuild after code changes:  add --build  (or: docker compose ... build)
+services:
+  kafka-ui:
+    container_name: kafka-ui
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: kafka-ui:kafka4
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # --- cluster connection (PLAINTEXT, no auth — ansible-kafka defaults) ---
+      KAFKA_CLUSTERS_0_NAME: kraft
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: 10.2.5.168:9092,10.2.5.169:9092,10.2.5.170:9092
+      # allow editing topic/broker configs from the UI
+      DYNAMIC_CONFIG_ENABLED: "true"
+      AUTH_TYPE: DISABLED

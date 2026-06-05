@@ -13,6 +13,7 @@ import com.provectus.kafka.ui.exception.IllegalEntityStateException;
 import com.provectus.kafka.ui.exception.NotFoundException;
 import com.provectus.kafka.ui.exception.ValidationException;
 import com.provectus.kafka.ui.util.KafkaVersion;
+import com.provectus.kafka.ui.util.MetadataVersion;
 import com.provectus.kafka.ui.util.annotation.KafkaClientInternalsDependant;
 import java.io.Closeable;
 import java.time.Duration;
@@ -49,6 +50,8 @@ import org.apache.kafka.clients.admin.ConsumerGroupListing;
 import org.apache.kafka.clients.admin.DescribeClusterOptions;
 import org.apache.kafka.clients.admin.DescribeClusterResult;
 import org.apache.kafka.clients.admin.DescribeConfigsOptions;
+import org.apache.kafka.clients.admin.FeatureMetadata;
+import org.apache.kafka.clients.admin.FinalizedVersionRange;
 import org.apache.kafka.clients.admin.ListConsumerGroupOffsetsSpec;
 import org.apache.kafka.clients.admin.ListOffsetsResult;
 import org.apache.kafka.clients.admin.ListTopicsOptions;
@@ -108,8 +111,8 @@ public class ReactiveAdminClient implements Closeable {
       this.predicate = (admin, ver) -> Mono.just(ver != null && ver >= fromVersion);
     }
 
-    static Mono<Set<SupportedFeature>> forVersion(AdminClient ac, String kafkaVersionStr) {
-      @Nullable Float kafkaVersion = KafkaVersion.parse(kafkaVersionStr).orElse(null);
+    static Mono<Set<SupportedFeature>> forVersion(AdminClient ac, Optional<String> kafkaVersionStr) {
+      @Nullable Float kafkaVersion = kafkaVersionStr.flatMap(KafkaVersion::parse).orElse(null);
       return Flux.fromArray(SupportedFeature.values())
           .flatMap(f -> f.predicate.apply(ac, kafkaVersion).map(enabled -> Tuples.of(f, enabled)))
           .filter(Tuple2::getT2)
@@ -144,18 +147,31 @@ public class ReactiveAdminClient implements Closeable {
                 .orElse(desc.getNodes().iterator().next().id());
             return loadBrokersConfig(ac, List.of(targetNodeId))
                 .map(map -> map.isEmpty() ? List.<ConfigEntry>of() : map.get(targetNodeId))
-                .flatMap(configs -> {
-                  String version = "1.0-UNKNOWN";
+                .zipWith(toMono(ac.describeFeatures().featureMetadata()))
+                .flatMap(tuple -> {
+                  List<ConfigEntry> configs = tuple.getT1();
+                  FeatureMetadata featureMetadata = tuple.getT2();
+                  Optional<String> version = Optional.empty();
                   boolean topicDeletionEnabled = true;
                   for (ConfigEntry entry : configs) {
                     if (entry.name().contains("inter.broker.protocol.version")) {
-                      version = entry.value();
+                      version = Optional.ofNullable(entry.value());
                     }
                     if (entry.name().equals("delete.topic.enable")) {
                       topicDeletionEnabled = Boolean.parseBoolean(entry.value());
                     }
                   }
-                  final String finalVersion = version;
+                  // KRaft brokers (Kafka 3.3+, mandatory since 4.0) don't expose
+                  // inter.broker.protocol.version, so we derive the version from the
+                  // metadata.version finalized feature instead.
+                  if (version.isEmpty()) {
+                    FinalizedVersionRange metadataVersion =
+                        featureMetadata.finalizedFeatures().get("metadata.version");
+                    if (metadataVersion != null) {
+                      version = MetadataVersion.findVersion(metadataVersion.maxVersionLevel());
+                    }
+                  }
+                  final String finalVersion = version.orElse("1.0-UNKNOWN");
                   final boolean finalTopicDeletionEnabled = topicDeletionEnabled;
                   return SupportedFeature.forVersion(ac, version)
                       .map(features -> new ConfigRelatedInfo(finalVersion, features, finalTopicDeletionEnabled));

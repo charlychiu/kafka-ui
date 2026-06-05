@@ -1,0 +1,11 @@
+# keep the Docker build context small and avoid copying host build artifacts
+.git
+.github
+**/target
+**/node_modules
+kafka-ui-react-app/build
+kafka-ui-react-app/coverage
+documentation
+.idea
+*.iml
+**/*.log
