@@ -1,0 +1,71 @@
+name: "Publish image to GHCR"
+
+# Builds the jar once on the runner, then pushes a slim runtime image to
+# GitHub Container Registry (ghcr.io/<owner>/kafka-ui). Uses the built-in
+# GITHUB_TOKEN — no extra secrets required.
+on:
+  push:
+    branches: [ "master" ]
+    tags: [ "v*" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'zulu'
+          cache: 'maven'
+
+      - name: Build jar (frontend + backend)
+        run: >-
+          ./mvnw -V -B -ntp clean package
+          -Pprod -Dmaven.test.skip=true -Ddocker.skip=true
+          -pl kafka-ui-api -am
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=short
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      # Slim runtime image: copies the jar built above onto a JRE base.
+      # The jar is platform-independent; build amd64 for the Linux KRaft hosts.
+      # To also publish arm64, swap the digest-pinned FROM in
+      # kafka-ui-api/Dockerfile for a multi-arch tag and add linux/arm64 here.
+      - name: Build and push image
+        uses: docker/build-push-action@v5
+        with:
+          context: kafka-ui-api
+          file: kafka-ui-api/Dockerfile
+          platforms: linux/amd64
+          provenance: false
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            JAR_FILE=kafka-ui-api-0.0.1-SNAPSHOT.jar
