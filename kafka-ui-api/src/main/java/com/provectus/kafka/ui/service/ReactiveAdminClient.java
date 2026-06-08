@@ -12,6 +12,7 @@ import com.google.common.collect.Table;
 import com.provectus.kafka.ui.exception.IllegalEntityStateException;
 import com.provectus.kafka.ui.exception.NotFoundException;
 import com.provectus.kafka.ui.exception.ValidationException;
+import com.provectus.kafka.ui.model.ControllerTypeDTO;
 import com.provectus.kafka.ui.util.KafkaVersion;
 import com.provectus.kafka.ui.util.MetadataVersion;
 import com.provectus.kafka.ui.util.annotation.KafkaClientInternalsDependant;
@@ -129,6 +130,8 @@ public class ReactiveAdminClient implements Closeable {
     Collection<Node> nodes;
     @Nullable // null, if ACL is disabled
     Set<AclOperation> authorizedOperations;
+    // KRAFT vs ZOOKEEPER, derived from whether the metadata quorum API is supported.
+    ControllerTypeDTO controllerType;
   }
 
   @Builder
@@ -430,7 +433,9 @@ public class ReactiveAdminClient implements Closeable {
             result.controller().get(),
             result.clusterId().get(),
             result.nodes().get(),
-            result.authorizedOperations().get()
+            result.authorizedOperations().get(),
+            // overwritten by resolveActiveController once the quorum API is probed
+            ControllerTypeDTO.UNKNOWN
           )
         )
     ).flatMap(desc -> resolveActiveController(client, desc));
@@ -442,21 +447,28 @@ public class ReactiveAdminClient implements Closeable {
   // active controller instead. ZooKeeper-based clusters don't support it, so we fall back to the
   // controller reported by describeCluster().
   private static Mono<ClusterDescription> resolveActiveController(AdminClient client, ClusterDescription desc) {
+    // A successful describeMetadataQuorum response also tells us the cluster runs on the KRaft
+    // metadata quorum; ZooKeeper-based clusters don't support the API and throw
+    // UnsupportedVersionException, which we map to ControllerType.ZOOKEEPER below.
     return toMono(client.describeMetadataQuorum().quorumInfo())
         .map(quorumInfo -> {
           int leaderId = quorumInfo.leaderId();
-          if (leaderId < 0) {
-            return desc;
-          }
-          Node leader = desc.getNodes().stream()
-              .filter(n -> n.id() == leaderId)
-              .findFirst()
-              // dedicated KRaft controllers aren't part of the broker node list
-              .orElse(new Node(leaderId, "", -1));
+          // leaderId < 0 means the quorum currently has no elected leader; keep the controller
+          // reported by describeCluster() as a best-effort value, but the cluster is still KRaft.
+          Node leader = leaderId < 0
+              ? desc.getController()
+              : desc.getNodes().stream()
+                  .filter(n -> n.id() == leaderId)
+                  .findFirst()
+                  // dedicated KRaft controllers aren't part of the broker node list
+                  .orElse(new Node(leaderId, "", -1));
           return new ClusterDescription(
-              leader, desc.getClusterId(), desc.getNodes(), desc.getAuthorizedOperations());
+              leader, desc.getClusterId(), desc.getNodes(), desc.getAuthorizedOperations(),
+              ControllerTypeDTO.KRAFT);
         })
-        .onErrorReturn(desc);
+        .onErrorResume(th -> Mono.just(new ClusterDescription(
+            desc.getController(), desc.getClusterId(), desc.getNodes(), desc.getAuthorizedOperations(),
+            ControllerTypeDTO.ZOOKEEPER)));
   }
 
   public Mono<Void> deleteConsumerGroups(Collection<String> groupIds) {

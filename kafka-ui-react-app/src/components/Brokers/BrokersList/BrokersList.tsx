@@ -1,4 +1,5 @@
 import React from 'react';
+import { ControllerType } from 'generated-sources';
 import { ClusterName } from 'redux/interfaces';
 import { useNavigate } from 'react-router-dom';
 import PageHeading from 'components/common/PageHeading/PageHeading';
@@ -27,6 +28,7 @@ const BrokersList: React.FC = () => {
   const {
     brokerCount,
     activeControllers,
+    controllerType,
     onlinePartitionCount,
     offlinePartitionCount,
     inSyncReplicasCount,
@@ -189,6 +191,12 @@ const BrokersList: React.FC = () => {
             )}
           </Metrics.Indicator>
           <Metrics.Indicator label="Version">{version}</Metrics.Indicator>
+          {(controllerType === ControllerType.KRAFT ||
+            controllerType === ControllerType.ZOOKEEPER) && (
+            <Metrics.Indicator label="Controller Type">
+              {controllerType === ControllerType.KRAFT ? 'KRaft' : 'ZooKeeper'}
+            </Metrics.Indicator>
+          )}
         </Metrics.Section>
         <Metrics.Section title="Partitions">
           <Metrics.Indicator

@@ -25,7 +25,8 @@ class PartitionDistributionStatsTest {
     var stats = PartitionDistributionStats.create(
         Statistics.builder()
             .clusterDescription(
-                new ReactiveAdminClient.ClusterDescription(null, "test", Set.of(n1, n2, n3), null))
+                new ReactiveAdminClient.ClusterDescription(
+                    null, "test", Set.of(n1, n2, n3), null, ControllerTypeDTO.UNKNOWN))
             .topicDescriptions(
                 Map.of(
                     "t1", new TopicDescription(

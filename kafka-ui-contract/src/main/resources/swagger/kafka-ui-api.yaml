@@ -2233,6 +2233,8 @@ components:
         activeControllers:
           type: integer
           description: Id of broker which is cluster's controller. null, if controller not known yet.
+        controllerType:
+          $ref: '#/components/schemas/ControllerType'
         onlinePartitionCount:
           type: integer
         offlinePartitionCount:
@@ -2249,6 +2251,17 @@ components:
             $ref: '#/components/schemas/BrokerDiskUsage'
         version:
           type: string
+
+    ControllerType:
+      type: string
+      description: >-
+        Cluster metadata mode. KRAFT means the cluster runs on the KRaft
+        metadata quorum (no ZooKeeper); ZOOKEEPER means a legacy ZooKeeper-backed
+        cluster; UNKNOWN if it could not be determined.
+      enum:
+        - UNKNOWN
+        - KRAFT
+        - ZOOKEEPER
 
     BrokerDiskUsage:
       type: object
@@ -2637,6 +2650,10 @@ components:
         - STABLE
         - DEAD
         - EMPTY
+        # KIP-848 new consumer rebalance protocol states (GA in Kafka 4.0).
+        # Groups using group.protocol=consumer transiently report these.
+        - ASSIGNING
+        - RECONCILING
 
     MessageFormat:
       type: string
