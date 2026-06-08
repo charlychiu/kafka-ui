@@ -414,6 +414,10 @@
                             </execution>
                         </executions>
                         <configuration>
+                            <!-- The Docker build context excludes .git (see .dockerignore), so the
+                                 self-contained image build has no git metadata. Degrade gracefully
+                                 instead of failing the whole build. -->
+                            <failOnNoGitDirectory>false</failOnNoGitDirectory>
                             <generateGitPropertiesFile>true</generateGitPropertiesFile>
                             <generateGitPropertiesFilename>${project.build.outputDirectory}/git.properties</generateGitPropertiesFilename>
                             <includeOnlyProperties>
