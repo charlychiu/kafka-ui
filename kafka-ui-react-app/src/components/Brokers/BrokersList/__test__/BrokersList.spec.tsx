@@ -18,6 +18,8 @@ jest.mock('react-router-dom', () => ({
 
 jest.mock('lib/hooks/api/brokers', () => ({
   useBrokers: jest.fn(),
+  // KraftQuorum (rendered by BrokersList) calls this; default to no data so it renders nothing.
+  useMetadataQuorum: jest.fn(() => ({ data: undefined })),
 }));
 jest.mock('lib/hooks/api/clusters', () => ({
   useClusterStats: jest.fn(),
