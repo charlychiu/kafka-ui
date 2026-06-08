@@ -8,6 +8,8 @@ import com.provectus.kafka.ui.model.BrokerDTO;
 import com.provectus.kafka.ui.model.BrokerLogdirUpdateDTO;
 import com.provectus.kafka.ui.model.BrokerMetricsDTO;
 import com.provectus.kafka.ui.model.BrokersLogdirsDTO;
+import com.provectus.kafka.ui.model.MetadataQuorumDTO;
+import com.provectus.kafka.ui.model.MetadataQuorumReplicaDTO;
 import com.provectus.kafka.ui.model.rbac.AccessContext;
 import com.provectus.kafka.ui.model.rbac.permission.ClusterConfigAction;
 import com.provectus.kafka.ui.service.BrokerService;
@@ -16,6 +18,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.admin.QuorumInfo;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ServerWebExchange;
@@ -42,6 +45,25 @@ public class BrokersController extends AbstractController implements BrokersApi 
     var job = brokerService.getBrokers(getCluster(clusterName)).map(clusterMapper::toBrokerDto);
     return validateAccess(context)
         .thenReturn(ResponseEntity.ok(job))
+        .doOnEach(sig -> audit(context, sig));
+  }
+
+  @Override
+  public Mono<ResponseEntity<MetadataQuorumDTO>> getMetadataQuorum(String clusterName,
+                                                                   ServerWebExchange exchange) {
+    var context = AccessContext.builder()
+        .cluster(clusterName)
+        .operationName("getMetadataQuorum")
+        .build();
+
+    return validateAccess(context)
+        .then(
+            brokerService.getMetadataQuorum(getCluster(clusterName))
+                .map(BrokersController::toMetadataQuorumDto)
+                .map(ResponseEntity::ok)
+                // empty => ZooKeeper cluster (no metadata quorum API)
+                .defaultIfEmpty(ResponseEntity.<MetadataQuorumDTO>notFound().build())
+        )
         .doOnEach(sig -> audit(context, sig));
   }
 
@@ -139,5 +161,37 @@ public class BrokersController extends AbstractController implements BrokersApi 
                 getCluster(clusterName), id, name, bci.getValue()))
             .map(ResponseEntity::ok)
     ).doOnEach(sig -> audit(context, sig));
+  }
+
+  private static MetadataQuorumDTO toMetadataQuorumDto(QuorumInfo q) {
+    // lag is measured against the leader's log end offset (fallback: high watermark)
+    long leaderLogEndOffset = q.voters().stream()
+        .filter(r -> r.replicaId() == q.leaderId())
+        .mapToLong(QuorumInfo.ReplicaState::logEndOffset)
+        .findFirst()
+        .orElse(q.highWatermark());
+    return new MetadataQuorumDTO()
+        .leaderId(q.leaderId())
+        .leaderEpoch(q.leaderEpoch())
+        .highWatermark(q.highWatermark())
+        .voters(q.voters().stream()
+            .map(r -> toMetadataQuorumReplicaDto(r, leaderLogEndOffset, q.leaderId()))
+            .toList())
+        .observers(q.observers().stream()
+            .map(r -> toMetadataQuorumReplicaDto(r, leaderLogEndOffset, q.leaderId()))
+            .toList());
+  }
+
+  private static MetadataQuorumReplicaDTO toMetadataQuorumReplicaDto(QuorumInfo.ReplicaState r,
+                                                                     long leaderLogEndOffset,
+                                                                     int leaderId) {
+    return new MetadataQuorumReplicaDTO()
+        .replicaId(r.replicaId())
+        .leader(r.replicaId() == leaderId)
+        .logEndOffset(r.logEndOffset())
+        .lag(Math.max(0, leaderLogEndOffset - r.logEndOffset()))
+        .lastFetchTimestamp(r.lastFetchTimestamp().isPresent() ? r.lastFetchTimestamp().getAsLong() : null)
+        .lastCaughtUpTimestamp(
+            r.lastCaughtUpTimestamp().isPresent() ? r.lastCaughtUpTimestamp().getAsLong() : null);
   }
 }

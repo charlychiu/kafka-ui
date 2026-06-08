@@ -15,6 +15,7 @@ import Tooltip from 'components/common/Tooltip/Tooltip';
 import ColoredCell from 'components/common/NewTable/ColoredCell';
 
 import SkewHeader from './SkewHeader/SkewHeader';
+import KraftQuorum from './KraftQuorum';
 import * as S from './BrokersList.styled';
 
 const NA = 'N/A';
@@ -256,6 +257,7 @@ const BrokersList: React.FC = () => {
         }
         emptyMessage="No clusters are online"
       />
+      <KraftQuorum />
     </>
   );
 };

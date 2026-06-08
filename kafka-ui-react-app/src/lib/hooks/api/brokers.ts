@@ -16,6 +16,15 @@ export function useBrokers(clusterName: ClusterName) {
   );
 }
 
+export function useMetadataQuorum(clusterName: ClusterName) {
+  return useQuery(
+    ['clusters', clusterName, 'metadata', 'quorum'],
+    () => api.getMetadataQuorum({ clusterName }),
+    // 404 on ZooKeeper clusters (no metadata quorum API) — don't retry, panel hides itself
+    { refetchInterval: 5000, retry: false }
+  );
+}
+
 export function useBrokerMetrics(clusterName: ClusterName, brokerId: number) {
   return useQuery(
     ['clusters', clusterName, 'brokers', brokerId, 'metrics'],

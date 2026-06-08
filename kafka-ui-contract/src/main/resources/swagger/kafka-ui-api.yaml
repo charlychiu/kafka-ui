@@ -77,6 +77,31 @@ paths:
                 items:
                   $ref: '#/components/schemas/Broker'
 
+  /api/clusters/{clusterName}/metadata/quorum:
+    get:
+      tags:
+        - Brokers
+      summary: getMetadataQuorum
+      operationId: getMetadataQuorum
+      description: >-
+        KRaft metadata quorum (controllers). Returns 404 on ZooKeeper-based
+        clusters, which don't expose the metadata quorum API.
+      parameters:
+        - name: clusterName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetadataQuorum'
+        404:
+          description: Not a KRaft cluster (metadata quorum API unsupported)
+
   /api/clusters/{clusterName}/brokers/{id}/configs:
     get:
       tags:
@@ -2262,6 +2287,54 @@ components:
         - UNKNOWN
         - KRAFT
         - ZOOKEEPER
+
+    MetadataQuorum:
+      type: object
+      description: KRaft metadata quorum state (controllers).
+      properties:
+        leaderId:
+          type: integer
+          description: Node id of the current quorum (controller) leader; -1 if unknown.
+        leaderEpoch:
+          type: integer
+          format: int64
+        highWatermark:
+          type: integer
+          format: int64
+        voters:
+          type: array
+          items:
+            $ref: '#/components/schemas/MetadataQuorumReplica'
+        observers:
+          type: array
+          items:
+            $ref: '#/components/schemas/MetadataQuorumReplica'
+
+    MetadataQuorumReplica:
+      type: object
+      properties:
+        replicaId:
+          type: integer
+        leader:
+          type: boolean
+          description: true if this replica is the current quorum leader.
+        logEndOffset:
+          type: integer
+          format: int64
+        lag:
+          type: integer
+          format: int64
+          description: How many offsets this replica is behind the leader's log end offset.
+        lastFetchTimestamp:
+          type: integer
+          format: int64
+          description: Epoch millis of this replica's last fetch from the leader; null if never.
+        lastCaughtUpTimestamp:
+          type: integer
+          format: int64
+          description: Epoch millis this replica was last caught up to the leader; null if never.
+      required:
+        - replicaId
 
     BrokerDiskUsage:
       type: object
