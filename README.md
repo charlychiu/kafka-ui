@@ -113,6 +113,30 @@ Edit `KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS` in `docker-compose.kafka4.yml` to point
 brokers, then open [http://localhost:8080](http://localhost:8080). Full details, configuration,
 and known limitations are in **[Kafka 4.0 / KRaft support](documentation/kafka-4.0-kraft.md)**.
 
+### Pre-built image (GitHub Container Registry)
+
+Every push to `master` (and every `v*` tag) automatically publishes a runtime image to GHCR via
+the [`Publish image to GHCR`](.github/workflows/ghcr-publish.yml) workflow — no local build needed:
+
+```
+docker pull ghcr.io/charlychiu/kafka-ui:latest
+```
+
+Run it directly against your KRaft cluster:
+
+```
+docker run -it -p 8080:8080 \
+  -e DYNAMIC_CONFIG_ENABLED=true \
+  -e AUTH_TYPE=DISABLED \
+  -e KAFKA_CLUSTERS_0_NAME=kraft \
+  -e KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=broker1:9092,broker2:9092,broker3:9092 \
+  ghcr.io/charlychiu/kafka-ui:latest
+```
+
+Available tags: `latest` (tip of `master`), `sha-<short>` (per commit), and `x.y` / `x.y.z`
+(on `v*` releases). The package is public; if you made it private, run `docker login ghcr.io`
+with a PAT that has `read:packages` first.
+
 ## Persistent installation
 
 ```
