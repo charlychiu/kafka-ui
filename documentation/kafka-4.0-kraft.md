@@ -97,6 +97,19 @@ the creatable/editable topic-config list.
 
 *Files:* `ReactiveAdminClient.java`.
 
+### 7. Controller quorum panel
+
+A new `GET /api/clusters/{clusterName}/metadata/quorum` endpoint exposes the full metadata
+quorum from `describeMetadataQuorum()` — leader, epoch, high watermark, and every voter/observer
+with its log-end-offset, lag (vs. the leader), and last-fetch / last-caught-up timestamps. The
+Brokers page renders this as a **"Controller quorum (KRaft)"** panel, so **dedicated controllers
+(`process.roles=controller`) are now visible** even though `describeCluster()` never returns them.
+The endpoint returns 404 on ZooKeeper clusters and the panel hides itself.
+
+*Files:* `ReactiveAdminClient.getMetadataQuorumInfo`, `BrokerService.getMetadataQuorum`,
+`BrokersController`, `kafka-ui-api.yaml` (`MetadataQuorum`/`MetadataQuorumReplica` + path),
+`BrokersList/KraftQuorum.tsx`, `lib/hooks/api/brokers.ts`.
+
 ### Dependency upgrades
 
 | Dependency | From | To | Why |
@@ -164,13 +177,11 @@ If the package is private, run `docker login ghcr.io` first (or make the package
 
 These are documented honestly rather than silently shipped half-done:
 
-- **Dedicated KRaft controllers are not listed in the Brokers table.** `AdminClient.describeCluster()`
-  returns only broker-role nodes in KRaft, so controller-only nodes (`process.roles=controller`)
-  have no row. Their id still appears in the *Active Controller* indicator and Controller Type is
-  shown, but the per-row "Active Controller" checkmark won't mark any row in dedicated-controller
-  deployments. Combined `broker,controller` mode is unaffected. A dedicated Controllers/Quorum
-  panel (surfacing voters/observers and per-voter lag from `describeMetadataQuorum`) is on the
-  roadmap.
+- **Dedicated KRaft controllers** (`process.roles=controller`) don't appear in the *broker* table —
+  `AdminClient.describeCluster()` returns broker-role nodes only — and the per-row "Active Controller"
+  checkmark in that table won't mark them. They are, however, listed with their replication state in
+  the new **Controller quorum (KRaft)** panel on the Brokers page (the leader is flagged there).
+  Combined `broker,controller` mode is unaffected.
 - **Consumer group type is not displayed.** Whether a group uses the classic or the new
   (KIP-848) `consumer` protocol (`ConsumerGroupDescription.type()`) is not yet surfaced.
 - **`metadata.version` levels beyond `4.2-IV1`** are not yet in the `MetadataVersion` enum;
@@ -193,7 +204,6 @@ These are documented honestly rather than silently shipped half-done:
 
 ## Roadmap
 
-- Controllers/Quorum panel surfacing dedicated controllers, voters, observers, and per-voter lag.
 - Consumer group `type` (classic / consumer / share / streams) column.
 - Bump to `kafka-clients` 4.x + `Admin.listGroups(...)` for share/streams group visibility.
 - Extend `MetadataVersion` mapping as new releases ship.

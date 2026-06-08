@@ -61,6 +61,7 @@ import org.apache.kafka.clients.admin.NewPartitions;
 import org.apache.kafka.clients.admin.NewTopic;
 import org.apache.kafka.clients.admin.OffsetSpec;
 import org.apache.kafka.clients.admin.ProducerState;
+import org.apache.kafka.clients.admin.QuorumInfo;
 import org.apache.kafka.clients.admin.RecordsToDelete;
 import org.apache.kafka.clients.admin.TopicDescription;
 import org.apache.kafka.clients.consumer.OffsetAndMetadata;
@@ -469,6 +470,12 @@ public class ReactiveAdminClient implements Closeable {
         .onErrorResume(th -> Mono.just(new ClusterDescription(
             desc.getController(), desc.getClusterId(), desc.getNodes(), desc.getAuthorizedOperations(),
             ControllerTypeDTO.ZOOKEEPER)));
+  }
+
+  // Full KRaft metadata quorum (leader, voters, observers with replication state). The Mono
+  // errors with UnsupportedVersionException on ZooKeeper-based clusters, which lack the API.
+  public Mono<QuorumInfo> getMetadataQuorumInfo() {
+    return toMono(client.describeMetadataQuorum().quorumInfo());
   }
 
   public Mono<Void> deleteConsumerGroups(Collection<String> groupIds) {

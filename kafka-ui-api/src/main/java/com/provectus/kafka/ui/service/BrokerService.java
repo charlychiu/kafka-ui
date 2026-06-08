@@ -21,12 +21,14 @@ import javax.annotation.Nullable;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.admin.ConfigEntry;
+import org.apache.kafka.clients.admin.QuorumInfo;
 import org.apache.kafka.common.Node;
 import org.apache.kafka.common.TopicPartitionReplica;
 import org.apache.kafka.common.errors.InvalidRequestException;
 import org.apache.kafka.common.errors.LogDirNotFoundException;
 import org.apache.kafka.common.errors.TimeoutException;
 import org.apache.kafka.common.errors.UnknownTopicOrPartitionException;
+import org.apache.kafka.common.errors.UnsupportedVersionException;
 import org.apache.kafka.common.requests.DescribeLogDirsResponse;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -75,6 +77,14 @@ public class BrokerService {
             .map(node -> new InternalBroker(node, partitionsDistribution, stats))
             .collect(Collectors.toList()))
         .flatMapMany(Flux::fromIterable);
+  }
+
+  public Mono<QuorumInfo> getMetadataQuorum(KafkaCluster cluster) {
+    return adminClientService.get(cluster)
+        .flatMap(ReactiveAdminClient::getMetadataQuorumInfo)
+        // ZooKeeper-based clusters don't support the metadata quorum API; surface as "no data"
+        // so the controller can return 404 and the UI can hide the quorum panel.
+        .onErrorResume(UnsupportedVersionException.class, e -> Mono.empty());
   }
 
   public Mono<Void> updateBrokerLogDir(KafkaCluster cluster,
