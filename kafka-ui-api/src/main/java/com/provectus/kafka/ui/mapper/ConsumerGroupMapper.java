@@ -110,6 +110,11 @@ public class ConsumerGroupMapper {
         return ConsumerGroupStateDTO.PREPARING_REBALANCE;
       case COMPLETING_REBALANCE:
         return ConsumerGroupStateDTO.COMPLETING_REBALANCE;
+      // KIP-848 new consumer rebalance protocol states (GA in Kafka 4.0)
+      case ASSIGNING:
+        return ConsumerGroupStateDTO.ASSIGNING;
+      case RECONCILING:
+        return ConsumerGroupStateDTO.RECONCILING;
       default:
         return ConsumerGroupStateDTO.UNKNOWN;
     }

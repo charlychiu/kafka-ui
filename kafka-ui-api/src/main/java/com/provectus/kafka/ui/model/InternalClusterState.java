@@ -16,6 +16,7 @@ public class InternalClusterState {
   private Integer topicCount;
   private Integer brokerCount;
   private Integer activeControllers;
+  private ControllerTypeDTO controllerType;
   private Integer onlinePartitionCount;
   private Integer offlinePartitionCount;
   private Integer inSyncReplicasCount;
@@ -41,6 +42,7 @@ public class InternalClusterState {
     activeControllers = Optional.ofNullable(statistics.getClusterDescription().getController())
         .map(Node::id)
         .orElse(null);
+    controllerType = statistics.getClusterDescription().getControllerType();
     version = statistics.getVersion();
 
     if (statistics.getLogDirInfo() != null) {

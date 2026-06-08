@@ -28,7 +28,8 @@ public class Statistics {
         .version("Unknown")
         .features(List.of())
         .clusterDescription(
-            new ReactiveAdminClient.ClusterDescription(null, null, List.of(), Set.of()))
+            new ReactiveAdminClient.ClusterDescription(
+                null, null, List.of(), Set.of(), ControllerTypeDTO.UNKNOWN))
         .metrics(Metrics.empty())
         .logDirInfo(InternalLogDirStats.empty())
         .topicDescriptions(Map.of())

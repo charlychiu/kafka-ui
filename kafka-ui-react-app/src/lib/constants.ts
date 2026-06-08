@@ -28,7 +28,6 @@ export const TOPIC_CUSTOM_PARAMS: Record<string, string> = {
   'follower.replication.throttled.replicas': '',
   'segment.bytes': '1073741824',
   'flush.messages': '9223372036854775807',
-  'message.format.version': '2.3-IV1',
   'file.delete.delay.ms': '60000',
   'max.compaction.lag.ms': '9223372036854775807',
   'min.compaction.lag.ms': '0',
@@ -105,5 +104,9 @@ export const CONSUMER_GROUP_STATE_TOOLTIPS: Record<ConsumerGroupState, string> =
       'Something has changed, and the reassignment of partitions is required.',
     COMPLETING_REBALANCE: 'Partition reassignment is in progress.',
     DEAD: 'The group is going to be removed. It might be due to the inactivity, or the group is being migrated to different group coordinator.',
+    ASSIGNING:
+      'New (KIP-848) consumer protocol: the group coordinator is computing partition assignments.',
+    RECONCILING:
+      'New (KIP-848) consumer protocol: members are reconciling their assigned partitions.',
     UNKNOWN: '',
   } as const;
