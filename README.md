@@ -26,6 +26,14 @@
 
 UI for Apache Kafka is a simple tool that makes your data flows observable, helps find and troubleshoot issues faster and deliver optimal performance. Its lightweight dashboard makes it easy to track key metrics of your Kafka clusters - Brokers, Topics, Partitions, Production, and Consumption.
 
+### About this fork
+
+> This is a **fork of the archived [provectus/kafka-ui](https://github.com/provectus/kafka-ui)**
+> that adds **Apache Kafka 4.0 / KRaft** support: ZooKeeper-less version detection, a real
+> active-controller resolved from the metadata quorum, a KRaft-vs-ZooKeeper Controller Type
+> indicator, KIP-848 consumer-group states, and a self-contained JDK 17 Docker image.
+> See **[Kafka 4.0 / KRaft support](documentation/kafka-4.0-kraft.md)** for details and how to run it.
+
 ### DISCLAIMER
 <em>UI for Apache Kafka is a free tool built and supported by the open-source community. Curated by Provectus, it will remain free and open-source, without any paid features or subscription plans to be added in the future.
 Looking for the help of Kafka experts? Provectus can help you design, build, deploy, and manage Apache Kafka clusters and streaming applications. Discover [Professional Services for Apache Kafka](https://provectus.com/professional-services-apache-kafka/), to unlock the full potential of Kafka in your enterprise! </em>
@@ -92,6 +100,18 @@ docker run -it -p 8080:8080 -e DYNAMIC_CONFIG_ENABLED=true provectuslabs/kafka-u
 Then access the web UI at [http://localhost:8080](http://localhost:8080)
 
 The command is sufficient to try things out. When you're done trying things out, you can proceed with a [persistent installation](https://docs.kafka-ui.provectus.io/quick-start/persistent-start)
+
+## Run against a Kafka 4.0 (KRaft) cluster
+
+This fork ships a self-contained build — the host only needs Docker (no JDK / Node / Maven):
+
+```
+docker compose -f docker-compose.kafka4.yml up -d --build
+```
+
+Edit `KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS` in `docker-compose.kafka4.yml` to point at your KRaft
+brokers, then open [http://localhost:8080](http://localhost:8080). Full details, configuration,
+and known limitations are in **[Kafka 4.0 / KRaft support](documentation/kafka-4.0-kraft.md)**.
 
 ## Persistent installation
 
