@@ -14,6 +14,9 @@ permissions:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    env:
+      # Exposed at job level so the SonarCloud steps can be skipped on forks without the secret.
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN_BACKEND }}
     steps:
       - uses: actions/checkout@v3
         with:
@@ -46,11 +49,15 @@ jobs:
           -Dsonar.pullrequest.branch=$HEAD_REF \
           -Dsonar.pullrequest.base=$BASE_REF
       - name: Build and analyze push master
-        if: ${{ github.event_name == 'push' }}
+        if: ${{ github.event_name == 'push' && env.SONAR_TOKEN != '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN_BACKEND }}
         run: |
           ./mvnw -B -ntp versions:set -DnewVersion=$GITHUB_SHA
           ./mvnw -B -V -ntp verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
           -Dsonar.projectKey=com.provectus:kafka-ui_backend
+      - name: Build and test push master (no SonarCloud)
+        if: ${{ github.event_name == 'push' && env.SONAR_TOKEN == '' }}
+        run: |
+          ./mvnw -B -ntp versions:set -DnewVersion=$GITHUB_SHA
+          ./mvnw -B -V -ntp verify
