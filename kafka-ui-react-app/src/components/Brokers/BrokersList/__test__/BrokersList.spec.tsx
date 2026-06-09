@@ -4,7 +4,7 @@ import { screen, waitFor } from '@testing-library/dom';
 import { clusterBrokerPath, clusterBrokersPath } from 'lib/paths';
 import BrokersList from 'components/Brokers/BrokersList/BrokersList';
 import userEvent from '@testing-library/user-event';
-import { useBrokers } from 'lib/hooks/api/brokers';
+import { useBrokers, useMetadataQuorum } from 'lib/hooks/api/brokers';
 import { useClusterStats } from 'lib/hooks/api/clusters';
 import { brokersPayload } from 'lib/fixtures/brokers';
 import { clusterStatsPayload } from 'lib/fixtures/clusters';
@@ -27,6 +27,12 @@ jest.mock('lib/hooks/api/clusters', () => ({
 
 describe('BrokersList Component', () => {
   const clusterName = 'local';
+
+  beforeEach(() => {
+    // KraftQuorum (rendered by BrokersList) reads this hook; resetMocks wipes the factory
+    // implementation before each test, so set it here. No data -> the panel renders nothing.
+    (useMetadataQuorum as jest.Mock).mockReturnValue({ data: undefined });
+  });
 
   const testInSyncReplicasCount = 798;
   const testOutOfSyncReplicasCount = 1;
