@@ -7,6 +7,10 @@ import { ClusterName } from 'redux/interfaces';
 import { useMetadataQuorum } from 'lib/hooks/api/brokers';
 import { MetadataQuorumReplica } from 'generated-sources';
 import { formatTimestamp } from 'lib/dateTimeHelpers';
+import CheckMarkRoundIcon from 'components/common/Icons/CheckMarkRoundIcon';
+import Tooltip from 'components/common/Tooltip/Tooltip';
+
+import * as S from './BrokersList.styled';
 
 type QuorumRow = MetadataQuorumReplica & { role: string };
 
@@ -19,9 +23,17 @@ const KraftQuorum: React.FC = () => {
 
   const rows = React.useMemo<QuorumRow[]>(() => {
     if (!data) return [];
+    // voters first, then observers; the admin API returns replicas in arbitrary
+    // order within each group, so sort by id for a stable display
+    const byId = (a: MetadataQuorumReplica, b: MetadataQuorumReplica) =>
+      a.replicaId - b.replicaId;
     return [
-      ...(data.voters ?? []).map((r) => ({ ...r, role: 'voter' })),
-      ...(data.observers ?? []).map((r) => ({ ...r, role: 'observer' })),
+      ...[...(data.voters ?? [])]
+        .sort(byId)
+        .map((r) => ({ ...r, role: 'voter' })),
+      ...[...(data.observers ?? [])]
+        .sort(byId)
+        .map((r) => ({ ...r, role: 'observer' })),
     ];
   }, [data]);
 
@@ -30,8 +42,19 @@ const KraftQuorum: React.FC = () => {
       {
         header: 'Replica ID',
         accessorKey: 'replicaId',
-        cell: ({ getValue, row }) =>
-          `${getValue<number>()}${row.original.leader ? ' ★' : ''}`,
+        // eslint-disable-next-line react/no-unstable-nested-components
+        cell: ({ getValue, row }) => (
+          <S.RowCell>
+            {getValue<number>()}
+            {row.original.leader && (
+              <Tooltip
+                value={<CheckMarkRoundIcon />}
+                content="Active controller (quorum leader)"
+                placement="right"
+              />
+            )}
+          </S.RowCell>
+        ),
       },
       { header: 'Role', accessorKey: 'role' },
       {
