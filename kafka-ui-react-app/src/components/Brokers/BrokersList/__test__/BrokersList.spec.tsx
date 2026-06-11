@@ -165,6 +165,42 @@ describe('BrokersList Component', () => {
       });
     });
 
+    describe('when metadata quorum is available', () => {
+      beforeEach(() => {
+        (useBrokers as jest.Mock).mockImplementation(() => ({
+          data: brokersPayload,
+        }));
+        (useClusterStats as jest.Mock).mockImplementation(() => ({
+          data: clusterStatsPayload,
+        }));
+        (useMetadataQuorum as jest.Mock).mockReturnValue({
+          data: {
+            leaderId: 100,
+            leaderEpoch: 1,
+            highWatermark: 1000,
+            voters: [
+              { replicaId: 100, leader: true, logEndOffset: 1000, lag: 0 },
+            ],
+            observers: [
+              { replicaId: 200, leader: false, logEndOffset: 1000, lag: 0 },
+            ],
+          },
+        });
+      });
+
+      it('renders quorum role tags in the brokers table', async () => {
+        renderComponent();
+        expect(
+          screen.getByRole('columnheader', { name: 'Quorum role' })
+        ).toBeInTheDocument();
+        const tags = screen.getAllByRole('widget');
+        expect(tags.map((tag) => tag.textContent)).toEqual([
+          'voter',
+          'observer',
+        ]);
+      });
+    });
+
     describe('when diskUsage is empty', () => {
       beforeEach(() => {
         (useBrokers as jest.Mock).mockImplementation(() => ({

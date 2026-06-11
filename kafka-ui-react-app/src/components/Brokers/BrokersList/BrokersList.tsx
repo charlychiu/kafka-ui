@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import PageHeading from 'components/common/PageHeading/PageHeading';
 import * as Metrics from 'components/common/Metrics';
 import useAppParams from 'lib/hooks/useAppParams';
-import { useBrokers } from 'lib/hooks/api/brokers';
+import { useBrokers, useMetadataQuorum } from 'lib/hooks/api/brokers';
 import { useClusterStats } from 'lib/hooks/api/clusters';
 import Table, { LinkCell, SizeCell } from 'components/common/NewTable';
 import CheckMarkRoundIcon from 'components/common/Icons/CheckMarkRoundIcon';
@@ -13,6 +13,7 @@ import { ColumnDef } from '@tanstack/react-table';
 import { clusterBrokerPath } from 'lib/paths';
 import Tooltip from 'components/common/Tooltip/Tooltip';
 import ColoredCell from 'components/common/NewTable/ColoredCell';
+import { Tag } from 'components/common/Tag/Tag.styled';
 
 import SkewHeader from './SkewHeader/SkewHeader';
 import KraftQuorum from './KraftQuorum';
@@ -25,6 +26,7 @@ const BrokersList: React.FC = () => {
   const { clusterName } = useAppParams<{ clusterName: ClusterName }>();
   const { data: clusterStats = {} } = useClusterStats(clusterName);
   const { data: brokers } = useBrokers(clusterName);
+  const { data: quorum } = useMetadataQuorum(clusterName);
 
   const {
     brokerCount,
@@ -38,6 +40,16 @@ const BrokersList: React.FC = () => {
     diskUsage,
     version,
   } = clusterStats;
+
+  // KRaft quorum role per node id; empty on ZooKeeper clusters (no quorum API)
+  const quorumRoleById = React.useMemo(() => {
+    const roles = new Map<number, 'voter' | 'observer'>();
+    quorum?.voters?.forEach(({ replicaId }) => roles.set(replicaId, 'voter'));
+    quorum?.observers?.forEach(({ replicaId }) =>
+      roles.set(replicaId, 'observer')
+    );
+    return roles;
+  }, [quorum]);
 
   const rows = React.useMemo(() => {
     let brokersResource;
@@ -66,9 +78,18 @@ const BrokersList: React.FC = () => {
         partitionsSkew: broker?.partitionsSkew,
         leadersSkew: broker?.leadersSkew,
         inSyncPartitions: broker?.inSyncPartitions,
+        quorumRole:
+          brokerId === undefined ? undefined : quorumRoleById.get(brokerId),
       };
     });
-  }, [diskUsage, brokers]);
+  }, [diskUsage, brokers, quorumRoleById]);
+
+  const hasQuorumRoles = quorumRoleById.size > 0;
+  // same marker and wording as the quorum panel below — they refer to the same node
+  const activeControllerTooltip =
+    controllerType === ControllerType.KRAFT
+      ? 'Active controller (quorum leader)'
+      : 'Active Controller';
 
   const columns = React.useMemo<ColumnDef<(typeof rows)[number]>[]>(
     () => [
@@ -85,13 +106,28 @@ const BrokersList: React.FC = () => {
             {getValue<string | number>() === activeControllers && (
               <Tooltip
                 value={<CheckMarkRoundIcon />}
-                content="Active Controller"
+                content={activeControllerTooltip}
                 placement="right"
               />
             )}
           </S.RowCell>
         ),
       },
+      ...(hasQuorumRoles
+        ? ([
+            {
+              header: 'Quorum role',
+              accessorKey: 'quorumRole',
+              // eslint-disable-next-line react/no-unstable-nested-components
+              cell: ({ getValue }) => {
+                const role = getValue<'voter' | 'observer' | undefined>();
+                return role ? (
+                  <Tag color={role === 'voter' ? 'blue' : 'gray'}>{role}</Tag>
+                ) : null;
+              },
+            },
+          ] as ColumnDef<(typeof rows)[number]>[])
+        : []),
       {
         header: 'Disk usage',
         accessorKey: 'size',
@@ -164,7 +200,7 @@ const BrokersList: React.FC = () => {
         accessorKey: 'host',
       },
     ],
-    []
+    [activeControllers, activeControllerTooltip, hasQuorumRoles]
   );
 
   const replicas = (inSyncReplicasCount ?? 0) + (outOfSyncReplicasCount ?? 0);
